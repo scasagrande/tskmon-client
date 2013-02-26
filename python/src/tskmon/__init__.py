@@ -65,9 +65,23 @@ class Task(object):
     def delete(self):
         self._client.delete(self._json_body['uri'])
         
+    # TODO: expose as properties once json_body bug is fixed.
+        
     def set_progress(self, new_prog):
         # TODO: implement as a property
         self._client.update(self._json_body['uri'], progress=new_prog)
+        
+    def set_max(self, new_max):
+        # TODO: implement as a property
+        self._client.update(self._json_body['uri'], max=new_max)
+        
+    def set_title(self, new_title):
+        # TODO: implement as a property
+        self._client.update(self._json_body['uri'], title=new_title)
+        
+    def set_status(self, new_status):
+        # TODO: implement as a property
+        self._client.update(self._json_body['uri'], status=new_status)
 
 class TskmonClient(object):
 
@@ -154,7 +168,11 @@ class TskmonClient(object):
             API_BASE + "/tasks/new?" + urllib.urlencode(params),
             'GET')
         
-        json_body = json.loads(response[1])
+        try:
+            json_body = json.loads(response[1])
+        except:
+            json_body = None
+            raise RuntimeError("Reponse wasn't JSON-formatted: {}".format(response[1]))
         if json_body['result'] != "success":
             raise RuntimeError("Didn't work!\n" + str(json_body['error']))
     
