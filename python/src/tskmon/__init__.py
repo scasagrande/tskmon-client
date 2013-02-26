@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 ##
-# tskmon_client.py: Client for the tskmon API.
+# __init__: Client for the tskmon API.
 ##
 # © 2013 Christopher E. Granade (cgranade@gmail.com)
 #
@@ -34,7 +34,7 @@ import time
 import os
 
 
-import config
+import tskmon.config
 
 ## CONSTANTS ###################################################################
 
