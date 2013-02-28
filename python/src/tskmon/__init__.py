@@ -60,9 +60,19 @@ consumer_secret = "anonymous"
 ## CLASSES #####################################################################
 
 class Task(object):
-    def __init__(self, client, json_body):
+    def __init__(self, client, json_body, notify_param={}):
         self._client = client
         self._json_body = json_body
+        self._notify_param = notify_param
+        
+        if self._notify_param.has_key('params'):
+            task_title = self._notify_param.get('params').get('title')
+            task_status = self._notify_param.get('params').get('status')
+        
+        # Send new task notification
+        if self._notify_param.has_key('new'):
+            if self._notify_param.get('new') is 1:
+                self._client.notify('Status: ' + str(task_status) , 'New task: ' + str(task_title))
         
     def delete(self):
         self._client.delete(self._json_body['uri'])
@@ -84,6 +94,13 @@ class Task(object):
     def set_status(self, new_status):
         # TODO: implement as a property
         self._client.update(self._json_body['uri'], status=new_status)
+        
+        # Send task status updated notification
+        if self._notify_param.has_key('status'):
+            if self._notify_param.get('status') is 1:
+                task_title = self._notify_param.get('params').get('title')
+                self._client.notify('New status: ' + str(new_status) , str(task_title))
+        
 
 class TskmonClient(object):
 
@@ -175,14 +192,30 @@ class TskmonClient(object):
         
         return params
         
-    def new_task(self, title, status="", progress=0, max_progress=None):
+    def new_task(self, title, status="", progress=0, max_progress=None, notify_params={}):
         # TODO: make this return a Task object that can be updated,
         #       instead of just returning the JSON.
+        '''
+            notify_params is a dictionary containing conditions when 
+            notifications should be sent out. Any missing parameters
+            are assumed to be false.
+
+            notify_params = {   'new' : 1 ,                 # on new task
+                                'delete': 1 ,               # on task delete
+                                'progress': [10,20,...] ,   # list of progress milestones
+                                'status' : 1,               # on status change
+                            }
+        '''
         params = {
             'title': title,
             'status': status,
             'progress': progress
         }
+        
+        # Add params to notify_params if notify_params not empty
+        if notify_params:
+            notify_params['params'] = params
+        
         if max_progress is not None: params['max'] = max_progress
         params.update(self._oauth_params())
         
@@ -206,7 +239,7 @@ class TskmonClient(object):
         if json_body['result'] != "success":
             raise RuntimeError("Didn't work!\n" + str(json_body['error']))
     
-        return Task(self, json_body['new_task'])
+        return Task(self, json_body['new_task'], notify_params)
         
     def delete(self, task_uri):
         params = self._oauth_params()
