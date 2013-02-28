@@ -63,7 +63,7 @@ class Task(object):
     def __init__(self, client, json_body, notify_param={}):
         self._client = client
         self._json_body = json_body
-        self._notify_param = notify_param
+        self._notify_param = notify_param.copy()
         
         if self._notify_param.has_key('params'):
             task_title = self._notify_param.get('params').get('title')
@@ -82,6 +82,19 @@ class Task(object):
     def set_progress(self, new_prog):
         # TODO: implement as a property
         self._client.update(self._json_body['uri'], progress=new_prog)
+        
+        # Send task progress update notification
+        if self._notify_param.has_key('progress'):
+            milestones = self._notify_param.get('progress')
+            task_title = self._notify_param.get('params').get('title')
+            if len(milestones) > 0: # If at least 1 progress milestone
+                old_prog = self._notify_param.get('params').get('progress')
+                # Check if we have passed a milestone
+                for ms in reversed(milestones):
+                    if (old_prog < ms) and (new_prog >= ms):
+                        self._client.notify('Task at ' + str(new_prog) + '%' , str(task_title))
+                        break
+                self._notify_param.get('params')['progress'] = new_prog
         
     def set_max(self, new_max):
         # TODO: implement as a property
@@ -192,7 +205,7 @@ class TskmonClient(object):
         
         return params
         
-    def new_task(self, title, status="", progress=0, max_progress=None, notify_params={}):
+    def new_task(self, title, status="", progress=0, max_progress=None, notify_rules={}):
         # TODO: make this return a Task object that can be updated,
         #       instead of just returning the JSON.
         '''
@@ -200,7 +213,7 @@ class TskmonClient(object):
             notifications should be sent out. Any missing parameters
             are assumed to be false.
 
-            notify_params = {   'new' : 1 ,                 # on new task
+            notify_rules = {   'new' : 1 ,                 # on new task
                                 'delete': 1 ,               # on task delete
                                 'progress': [10,20,...] ,   # list of progress milestones
                                 'status' : 1,               # on status change
@@ -212,9 +225,16 @@ class TskmonClient(object):
             'progress': progress
         }
         
+        # Make a copy so we don't mess with the user's original
+        notify_params = notify_rules.copy()
+        
         # Add params to notify_params if notify_params not empty
         if notify_params:
-            notify_params['params'] = params
+            notify_params['params'] = params.copy()
+            
+        # If it exists, sort the progress notification milestone list
+        if notify_params.has_key('progress'):
+            notify_params['progress'].sort()
         
         if max_progress is not None: params['max'] = max_progress
         params.update(self._oauth_params())
