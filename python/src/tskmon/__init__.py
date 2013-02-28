@@ -3,7 +3,8 @@
 ##
 # __init__: Client for the tskmon API.
 ##
-# © 2013 Christopher E. Granade (cgranade@gmail.com)
+# © 2013 Christopher E. Granade (cgranade@gmail.com) and
+#        Steven Casagrande (stevencasagrande@gmail.com)
 #
 # This file is a part of the tskmon project.
 # Licensed under the AGPL version 3.
@@ -33,6 +34,7 @@ import time
 
 import os
 
+import pushnotify
 
 import tskmon.config
 
@@ -133,6 +135,34 @@ class TskmonClient(object):
             conf.set(SERVER, 'oauth_token_secret', access_token['oauth_token_secret'])
             config.save_config(conf)
         
+        # PUSHOVER #
+        api_token = ''
+        user_key = ''
+        # Check if config file has entries for Pushover keys
+        if conf.has_section('PUSHOVER') and conf.has_option('PUSHOVER', 'api_token'):
+            api_token = conf.get('PUSHOVER', 'api_token')
+            user_key = conf.get('PUSHOVER', 'user_key')
+        else:
+            # Check if user wishes to use pushover
+            api_token = raw_input("Please enter Pushover API key. If you don't wish to use Pushover, leave blank:\n")
+            if api_token is not '':
+                user_key = raw_input("Please enter your Pushover user key:\n")
+                
+            # Save API and User keys to config file
+            if not conf.has_section('PUSHOVER'):
+                conf.add_section('PUSHOVER')
+            conf.set('PUSHOVER', 'api_token', api_token)
+            conf.set('PUSHOVER', 'user_key', user_key)
+            config.save_config(conf)
+        
+        # Setup pushover client
+        if api_token is not '':
+            self._pushover = pushnotify.pushover.Client(api_token)
+            self._pushover.add_key(user_key)  
+            # Check to make sure user_key is valid
+            if not self._pushover.verify_user(user_key):
+                raise RuntimeError("User key not valid: " + user_key) 
+        
     def _oauth_params(self):
         params = {
             'oauth_version': "1.0",
@@ -229,4 +259,7 @@ class TskmonClient(object):
             raise RuntimeError("Didn't work!\n" + str(json_body['error']))
     
         self._json_body = json_body['updated_task']
+        
+    def notify(self, description, event, split=True, kwargs=None):
+        return self._pushover.notify(description,event,split,kwargs)
         
